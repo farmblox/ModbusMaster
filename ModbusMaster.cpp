@@ -25,6 +25,7 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 
 */
 
+// Edited by Jesse van Rhijn <jesse.v.rhijn@gmail.com>
 
 /* _____PROJECT INCLUDES_____________________________________________________ */
 #include "ModbusMaster.h"
@@ -58,7 +59,7 @@ Call once class has been instantiated, typically within setup().
 @param &serial reference to serial port object (Serial, Serial1, ... Serial3)
 @ingroup setup
 */
-void ModbusMaster::begin(uint8_t slave, Stream &serial)
+void ModbusMaster::begin(uint8_t slave, Serial &serial)
 {
 //  txBuffer = (uint16_t*) calloc(ku8MaxBufferSize, sizeof(uint16_t));
   _u8MBSlave = slave;
@@ -603,7 +604,6 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   uint8_t u8ModbusADUSize = 0;
   uint8_t i, u8Qty;
   uint16_t u16CRC;
-  uint32_t u32StartTime;
   uint8_t u8BytesLeft = 8;
   uint8_t u8MBStatus = ku8MBSuccess;
   
@@ -702,7 +702,8 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   u8ModbusADU[u8ModbusADUSize] = 0;
 
   // flush receive buffer before transmitting request
-  while (_serial->read() != -1);
+  //while (_serial->getc() != EOF);
+
 
   // transmit request
   if (_preTransmission)
@@ -711,26 +712,28 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   }
   for (i = 0; i < u8ModbusADUSize; i++)
   {
-    _serial->write(u8ModbusADU[i]);
+    _serial->putc(u8ModbusADU[i]);
   }
   
   u8ModbusADUSize = 0;
-  _serial->flush();    // flush transmit buffer
+  //_serial->flush();    // flush transmit buffer
+  //Not needed, since mbed::Serial is not buffered
   if (_postTransmission)
   {
     _postTransmission();
   }
   
   // loop until we run out of time or bytes, or an error occurs
-  u32StartTime = millis();
+  Timer timer;
+  timer.start();
   while (u8BytesLeft && !u8MBStatus)
   {
-    if (_serial->available())
+    if (_serial->readable())
     {
 #if __MODBUSMASTER_DEBUG__
       digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, true);
 #endif
-      u8ModbusADU[u8ModbusADUSize++] = _serial->read();
+      u8ModbusADU[u8ModbusADUSize++] = _serial->getc();
       u8BytesLeft--;
 #if __MODBUSMASTER_DEBUG__
       digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, false);
@@ -797,9 +800,10 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
           break;
       }
     }
-    if ((millis() - u32StartTime) > ku16MBResponseTimeout)
+    if ((timer.read_ms()) > ku16MBResponseTimeout)
     {
       u8MBStatus = ku8MBResponseTimedOut;
+      timer.stop();
     }
   }
   

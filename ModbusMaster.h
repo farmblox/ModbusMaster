@@ -31,6 +31,7 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 
 */
 
+// Edited by Jesse van Rhijn <jesse.v.rhijn@gmail.com>
   
 #ifndef ModbusMaster_h
 #define ModbusMaster_h
@@ -48,7 +49,7 @@ Set to 1 to enable debugging features within class:
 
 /* _____STANDARD INCLUDES____________________________________________________ */
 // include types & constants of Wiring core API
-#include "Arduino.h"
+#include "mbed.h"
 
 /* _____UTILITY MACROS_______________________________________________________ */
 
@@ -71,7 +72,7 @@ class ModbusMaster
   public:
     ModbusMaster();
    
-    void begin(uint8_t, Stream &serial);
+    void begin(uint8_t, Serial &serial);
     void idle(void (*)());
     void preTransmission(void (*)());
     void postTransmission(void (*)());
@@ -218,7 +219,7 @@ class ModbusMaster
     uint8_t  readWriteMultipleRegisters(uint16_t, uint16_t);
     
   private:
-    Stream* _serial;                                             ///< reference to serial port object
+    Serial* _serial;                                             ///< reference to serial port object
     uint8_t  _u8MBSlave;                                         ///< Modbus slave (1..255) initialized in begin()
     static const uint8_t ku8MaxBufferSize                = 64;   ///< size of response/transmit buffers    
     uint16_t _u16ReadAddress;                                    ///< slave register from which to read

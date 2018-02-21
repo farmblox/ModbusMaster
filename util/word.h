@@ -32,10 +32,38 @@ This header file provides utility functions for manipulating words.
 
 */
 
+// Edited by Jesse van Rhijn <jesse.v.rhijn@gmail.com>
 
 #ifndef _UTIL_WORD_H_
 #define _UTIL_WORD_H_
 
+/**
+ * Arduino word functions
+ */
+
+static inline uint16_t word(uint8_t high, uint8_t low) {
+  return (high << 8) + low;
+}
+
+template<class T>
+static inline uint16_t word(T data) {
+  return (uint16_t) data;
+}
+
+template<class T>
+static inline uint8_t lowByte(T data) {
+  return (uint8_t) (data & 0xFF);
+}
+
+template<class T>
+static inline uint8_t highByte(T data) {
+  return (uint8_t) (data >> 8);
+}
+
+#define bitRead(value, bit) (((value) >> (bit)) & 0x01)
+#define bitSet(value, bit) ((value) |= (1UL << (bit)))
+#define bitClear(value, bit) ((value) &= ~(1UL << (bit)))
+#define bitWrite(value, bit, bitvalue) (bitvalue ? bitSet(value, bit) : bitClear(value, bit))
 
 /** @ingroup util_word
     Return low word of a 32-bit integer.
