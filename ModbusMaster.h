@@ -72,7 +72,7 @@ class ModbusMaster
   public:
     ModbusMaster();
    
-    void begin(uint8_t, Serial &serial);
+    void begin(uint8_t, RawSerial &serial);
     void idle(void (*)());
     void preTransmission(void (*)());
     void postTransmission(void (*)());
@@ -219,7 +219,7 @@ class ModbusMaster
     uint8_t  readWriteMultipleRegisters(uint16_t, uint16_t);
     
   private:
-    Serial* _serial;                                             ///< reference to serial port object
+    RawSerial* _serial;                                             ///< reference to serial port object
     uint8_t  _u8MBSlave;                                         ///< Modbus slave (1..255) initialized in begin()
     static const uint8_t ku8MaxBufferSize                = 64;   ///< size of response/transmit buffers    
     uint16_t _u16ReadAddress;                                    ///< slave register from which to read
