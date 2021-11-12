@@ -50,6 +50,7 @@ Set to 1 to enable debugging features within class:
 /* _____STANDARD INCLUDES____________________________________________________ */
 // include types & constants of Wiring core API
 #include "mbed.h"
+#include "mbed-rs485/RS485.h"
 
 /* _____UTILITY MACROS_______________________________________________________ */
 
@@ -72,7 +73,7 @@ class ModbusMaster
   public:
     ModbusMaster();
    
-    void begin(uint8_t, RawSerial &serial);
+    void begin(uint8_t, RS485 &serial);
     void idle(void (*)());
     void preTransmission(void (*)());
     void postTransmission(void (*)());
@@ -193,6 +194,7 @@ class ModbusMaster
     void     clearResponseBuffer();
     uint8_t  setTransmitBuffer(uint8_t, uint16_t);
     void     clearTransmitBuffer();
+    uint16_t getTransmitBuffer(uint8_t);
     
     void beginTransmission(uint16_t);
     uint8_t requestFrom(uint16_t, uint16_t);
@@ -219,7 +221,7 @@ class ModbusMaster
     uint8_t  readWriteMultipleRegisters(uint16_t, uint16_t);
     
   private:
-    RawSerial* _serial;                                             ///< reference to serial port object
+    RS485* _serial;                                             ///< reference to serial port object
     uint8_t  _u8MBSlave;                                         ///< Modbus slave (1..255) initialized in begin()
     static const uint8_t ku8MaxBufferSize                = 64;   ///< size of response/transmit buffers    
     uint16_t _u16ReadAddress;                                    ///< slave register from which to read
@@ -250,7 +252,7 @@ class ModbusMaster
     static const uint8_t ku8MBReadWriteMultipleRegisters = 0x17; ///< Modbus function 0x17 Read Write Multiple Registers
     
     // Modbus timeout [milliseconds]
-    static const uint16_t ku16MBResponseTimeout          = 50; ///< Modbus timeout [milliseconds]
+    static const uint16_t ku16MBResponseTimeout          = 100; ///< Modbus timeout [milliseconds]
     
     // master function that conducts Modbus transactions
     uint8_t ModbusMasterTransaction(uint8_t u8MBFunction);

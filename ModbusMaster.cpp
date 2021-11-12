@@ -59,13 +59,18 @@ Call once class has been instantiated, typically within setup().
 @param &serial reference to serial port object (Serial, Serial1, ... Serial3)
 @ingroup setup
 */
-void ModbusMaster::begin(uint8_t slave, RawSerial &serial)
+void ModbusMaster::begin(uint8_t slave, RS485 &serial)
 {
 //  txBuffer = (uint16_t*) calloc(ku8MaxBufferSize, sizeof(uint16_t));
   _u8MBSlave = slave;
   _serial = &serial;
   _u8TransmitBufferIndex = 0;
   u16TransmitBufferLength = 0;
+
+//   _serial->enable_output( false );
+//   _serial->enable_input( false );
+  _serial->set_blocking( true );
+
   
 #if __MODBUSMASTER_DEBUG__
   pinMode(__MODBUSMASTER_DEBUG_PIN_A__, OUTPUT);
@@ -198,6 +203,7 @@ Receiver Enable pin, and disable its Driver Enable pin.
 void ModbusMaster::postTransmission(void (*postTransmission)())
 {
   _postTransmission = postTransmission;
+//   _serial->attach(_postTransmission, SerialBase::TxIrq);
 }
 
 
@@ -214,6 +220,27 @@ uint16_t ModbusMaster::getResponseBuffer(uint8_t u8Index)
   if (u8Index < ku8MaxBufferSize)
   {
     return _u16ResponseBuffer[u8Index];
+  }
+  else
+  {
+    return 0xFFFF;
+  }
+}
+
+
+/**
+Retrieve data from transmit buffer.
+
+@see ModbusMaster::clearResponseBuffer()
+@param u8Index index of response buffer array (0x00..0x3F)
+@return value in position u8Index of response buffer (0x0000..0xFFFF)
+@ingroup buffer
+*/
+uint16_t ModbusMaster::getTransmitBuffer(uint8_t u8Index)
+{
+  if (u8Index < ku8MaxBufferSize)
+  {
+    return _u16TransmitBuffer[u8Index];
   }
   else
   {
@@ -583,7 +610,7 @@ Sequence:
 */
 uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
 {
-  uint8_t u8ModbusADU[256];
+  char u8ModbusADU[256];
   uint8_t u8ModbusADUSize = 0;
   uint8_t i, u8Qty;
   uint16_t u16CRC;
@@ -689,22 +716,46 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
 
 
   // transmit request
-  if (_preTransmission)
-  {
-    _preTransmission();
-  }
-  for (i = 0; i < u8ModbusADUSize; i++)
-  {
-    _serial->putc(u8ModbusADU[i]);
-  }
+//   if (_preTransmission)
+//   {
+//     _preTransmission();
+//   }
+
+//   _serial->enable_input(false);
+//   _serial->enable_output(true);
+//   printf("Begin transmition: ");
+    // printf("%02X ", u8ModbusADU[i]);
+    // printf("Sending: ");
+    // for (i = 0; i < u8ModbusADUSize; i++)
+    // {
+    //     printf("%02X ", u8ModbusADU[i]);
+    // }
+    // printf("\n");
+    
+    _serial->write(u8ModbusADU, u8ModbusADUSize);
+//   }
+
+//   _serial->write(&u8ModbusADU, u8ModbusADUSize);
+
+//   _serial->enable_input(true);
+//   _serial->enable_output(false);
+
+
+//   _serial->write(&u8ModbusADU, u8ModbusADUSize);
   
+//   if (_serial->writeable())
+//   {
   u8ModbusADUSize = 0;
+//   }
   //_serial->flush();    // flush transmit buffer
   //Not needed, since mbed::Serial is not buffered
-  if (_postTransmission)
-  {
-    _postTransmission();
-  }
+//   if (_postTransmission)
+//   {
+//     _postTransmission();
+//   }
+
+  
+//   printf("\n");
   
   // loop until we run out of time or bytes, or an error occurs
   Timer timer;
@@ -713,26 +764,30 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   {
     if (_serial->readable())
     {
+        // printf("Reading serial");
 #if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, true);
+      __MODBUSMASTER_DEBUG_PIN_A__ = 1;
 #endif
-      u8ModbusADU[u8ModbusADUSize++] = _serial->getc();
+    //   u8ModbusADU[u8ModbusADUSize++] = _serial->read();
+    char read_buf;
+    _serial->read(&read_buf, 1);
+    u8ModbusADU[u8ModbusADUSize++] = read_buf;
       u8BytesLeft--;
 #if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, false);
+      __MODBUSMASTER_DEBUG_PIN_A__ = 0;
 #endif
     }
     else
     {
 #if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_B__, true);
+      __MODBUSMASTER_DEBUG_PIN_B__ = 1;
 #endif
       if (_idle)
       {
         _idle();
       }
 #if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_B__, false);
+      __MODBUSMASTER_DEBUG_PIN_B__ = 0;
 #endif
     }
     
@@ -783,7 +838,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
           break;
       }
     }
-    if ((timer.read_ms()) > ku16MBResponseTimeout)
+    if ((duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout)
     {
       u8MBStatus = ku8MBResponseTimedOut;
       timer.stop();
