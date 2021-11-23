@@ -25,23 +25,12 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 
 */
 
-// Edited by Jesse van Rhijn <jesse.v.rhijn@gmail.com>
-
-/* _____PROJECT INCLUDES_____________________________________________________ */
 #include "ModbusMaster.h"
 
+#include "mbed-trace/mbed_trace.h"
+#define TRACE_GROUP "MODBUS"
 
-/* _____GLOBAL VARIABLES_____________________________________________________ */
 
-
-/* _____PUBLIC FUNCTIONS_____________________________________________________ */
-/**
-Constructor.
-
-Creates class object; initialize it using ModbusMaster::begin().
-
-@ingroup setup
-*/
 ModbusMaster::ModbusMaster(void)
 {
   _idle = 0;
@@ -69,7 +58,7 @@ void ModbusMaster::begin(uint8_t slave, RS485 &serial)
 
 //   _serial->enable_output( false );
 //   _serial->enable_input( false );
-  _serial->set_blocking( true );
+//   _serial->set_blocking( true );
 
   
 #if __MODBUSMASTER_DEBUG__
@@ -125,13 +114,6 @@ void ModbusMaster::send(uint8_t data)
 }
 
 
-
-
-
-
-
-
-
 uint8_t ModbusMaster::available(void)
 {
   return _u8ResponseBufferLength - _u8ResponseBufferIndex;
@@ -149,12 +131,6 @@ uint16_t ModbusMaster::receive(void)
     return 0xFFFF;
   }
 }
-
-
-
-
-
-
 
 
 /**
@@ -712,112 +688,53 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   u8ModbusADU[u8ModbusADUSize] = 0;
 
   // flush receive buffer before transmitting request
-  //while (_serial->getc() != EOF);
+  while (_serial->available()) {
+      _serial->read_single();
+  };
 
+  _serial->write(u8ModbusADU, u8ModbusADUSize);
 
-  // transmit request
-//   if (_preTransmission)
-//   {
-//     _preTransmission();
-//   }
-
-//   _serial->enable_input(false);
-//   _serial->enable_output(true);
-//   printf("Begin transmition: ");
-    // printf("%02X ", u8ModbusADU[i]);
-    // printf("Sending: ");
-    // for (i = 0; i < u8ModbusADUSize; i++)
-    // {
-    //     printf("%02X ", u8ModbusADU[i]);
-    // }
-    // printf("\n");
-    
-    _serial->write(u8ModbusADU, u8ModbusADUSize);
-//   }
-
-//   _serial->write(&u8ModbusADU, u8ModbusADUSize);
-
-//   _serial->enable_input(true);
-//   _serial->enable_output(false);
-
-
-//   _serial->write(&u8ModbusADU, u8ModbusADUSize);
-  
-//   if (_serial->writeable())
-//   {
   u8ModbusADUSize = 0;
-//   }
-  //_serial->flush();    // flush transmit buffer
-  //Not needed, since mbed::Serial is not buffered
-//   if (_postTransmission)
-//   {
-//     _postTransmission();
-//   }
-
-  
-//   printf("\n");
   
   // loop until we run out of time or bytes, or an error occurs
   Timer timer;
   timer.start();
-  while (u8BytesLeft && !u8MBStatus)
-  {
-    if (_serial->readable())
-    {
-        // printf("Reading serial");
-#if __MODBUSMASTER_DEBUG__
-      __MODBUSMASTER_DEBUG_PIN_A__ = 1;
-#endif
-    //   u8ModbusADU[u8ModbusADUSize++] = _serial->read();
-    char read_buf;
-    _serial->read(&read_buf, 1);
-    u8ModbusADU[u8ModbusADUSize++] = read_buf;
-      u8BytesLeft--;
-#if __MODBUSMASTER_DEBUG__
-      __MODBUSMASTER_DEBUG_PIN_A__ = 0;
-#endif
+  while (u8BytesLeft && !u8MBStatus) {
+    if (_serial->available()) {
+        char read_buf;
+        _serial->read(&read_buf, 1);
+        // printf("%02X ", read_buf);
+        u8ModbusADU[u8ModbusADUSize++] = read_buf;
+        u8BytesLeft--;
     }
-    else
-    {
-#if __MODBUSMASTER_DEBUG__
-      __MODBUSMASTER_DEBUG_PIN_B__ = 1;
-#endif
-      if (_idle)
-      {
+    else {
+      if (_idle) {
         _idle();
       }
-#if __MODBUSMASTER_DEBUG__
-      __MODBUSMASTER_DEBUG_PIN_B__ = 0;
-#endif
     }
     
     // evaluate slave ID, function code once enough bytes have been read
-    if (u8ModbusADUSize == 5)
-    {
+    if (u8ModbusADUSize == 5) {
       // verify response is for correct Modbus slave
-      if (u8ModbusADU[0] != _u8MBSlave)
-      {
+      if (u8ModbusADU[0] != _u8MBSlave) {
         u8MBStatus = ku8MBInvalidSlaveID;
         break;
       }
       
       // verify response is for correct Modbus function code (mask exception bit 7)
-      if ((u8ModbusADU[1] & 0x7F) != u8MBFunction)
-      {
+      if ((u8ModbusADU[1] & 0x7F) != u8MBFunction) {
         u8MBStatus = ku8MBInvalidFunction;
         break;
       }
       
       // check whether Modbus exception occurred; return Modbus Exception Code
-      if (bitRead(u8ModbusADU[1], 7))
-      {
+      if (bitRead(u8ModbusADU[1], 7)) {
         u8MBStatus = u8ModbusADU[2];
         break;
       }
       
       // evaluate returned Modbus function code
-      switch(u8ModbusADU[1])
-      {
+      switch(u8ModbusADU[1]) {
         case ku8MBReadCoils:
         case ku8MBReadDiscreteInputs:
         case ku8MBReadInputRegisters:
@@ -825,29 +742,27 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
         case ku8MBReadWriteMultipleRegisters:
           u8BytesLeft = u8ModbusADU[2];
           break;
-          
         case ku8MBWriteSingleCoil:
         case ku8MBWriteMultipleCoils:
         case ku8MBWriteSingleRegister:
         case ku8MBWriteMultipleRegisters:
           u8BytesLeft = 3;
           break;
-          
         case ku8MBMaskWriteRegister:
           u8BytesLeft = 5;
           break;
       }
     }
-    if ((duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout)
-    {
+    if ((duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout) {
       u8MBStatus = ku8MBResponseTimedOut;
       timer.stop();
     }
   }
+
+//   printf("\n");
   
   // verify response is large enough to inspect further
-  if (!u8MBStatus && u8ModbusADUSize >= 5)
-  {
+  if (!u8MBStatus && u8ModbusADUSize >= 5) {
     // calculate CRC
     u16CRC = 0xFFFF;
     for (i = 0; i < (u8ModbusADUSize - 2); i++)
