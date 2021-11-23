@@ -25,23 +25,12 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 
 */
 
-// Edited by Jesse van Rhijn <jesse.v.rhijn@gmail.com>
-
-/* _____PROJECT INCLUDES_____________________________________________________ */
 #include "ModbusMaster.h"
 
+#include "mbed-trace/mbed_trace.h"
+#define TRACE_GROUP "MODBUS"
 
-/* _____GLOBAL VARIABLES_____________________________________________________ */
 
-
-/* _____PUBLIC FUNCTIONS_____________________________________________________ */
-/**
-Constructor.
-
-Creates class object; initialize it using ModbusMaster::begin().
-
-@ingroup setup
-*/
 ModbusMaster::ModbusMaster(void)
 {
   _idle = 0;
@@ -59,13 +48,18 @@ Call once class has been instantiated, typically within setup().
 @param &serial reference to serial port object (Serial, Serial1, ... Serial3)
 @ingroup setup
 */
-void ModbusMaster::begin(uint8_t slave, RawSerial &serial)
+void ModbusMaster::begin(uint8_t slave, RS485 &serial)
 {
 //  txBuffer = (uint16_t*) calloc(ku8MaxBufferSize, sizeof(uint16_t));
   _u8MBSlave = slave;
   _serial = &serial;
   _u8TransmitBufferIndex = 0;
   u16TransmitBufferLength = 0;
+
+//   _serial->enable_output( false );
+//   _serial->enable_input( false );
+//   _serial->set_blocking( true );
+
   
 #if __MODBUSMASTER_DEBUG__
   pinMode(__MODBUSMASTER_DEBUG_PIN_A__, OUTPUT);
@@ -120,13 +114,6 @@ void ModbusMaster::send(uint8_t data)
 }
 
 
-
-
-
-
-
-
-
 uint8_t ModbusMaster::available(void)
 {
   return _u8ResponseBufferLength - _u8ResponseBufferIndex;
@@ -144,12 +131,6 @@ uint16_t ModbusMaster::receive(void)
     return 0xFFFF;
   }
 }
-
-
-
-
-
-
 
 
 /**
@@ -198,6 +179,7 @@ Receiver Enable pin, and disable its Driver Enable pin.
 void ModbusMaster::postTransmission(void (*postTransmission)())
 {
   _postTransmission = postTransmission;
+//   _serial->attach(_postTransmission, SerialBase::TxIrq);
 }
 
 
@@ -214,6 +196,27 @@ uint16_t ModbusMaster::getResponseBuffer(uint8_t u8Index)
   if (u8Index < ku8MaxBufferSize)
   {
     return _u16ResponseBuffer[u8Index];
+  }
+  else
+  {
+    return 0xFFFF;
+  }
+}
+
+
+/**
+Retrieve data from transmit buffer.
+
+@see ModbusMaster::clearResponseBuffer()
+@param u8Index index of response buffer array (0x00..0x3F)
+@return value in position u8Index of response buffer (0x0000..0xFFFF)
+@ingroup buffer
+*/
+uint16_t ModbusMaster::getTransmitBuffer(uint8_t u8Index)
+{
+  if (u8Index < ku8MaxBufferSize)
+  {
+    return _u16TransmitBuffer[u8Index];
   }
   else
   {
@@ -583,7 +586,7 @@ Sequence:
 */
 uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
 {
-  uint8_t u8ModbusADU[256];
+  char u8ModbusADU[256];
   uint8_t u8ModbusADUSize = 0;
   uint8_t i, u8Qty;
   uint16_t u16CRC;
@@ -685,84 +688,53 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   u8ModbusADU[u8ModbusADUSize] = 0;
 
   // flush receive buffer before transmitting request
-  //while (_serial->getc() != EOF);
+  while (_serial->available()) {
+      _serial->read_single();
+  };
 
+  _serial->write(u8ModbusADU, u8ModbusADUSize);
 
-  // transmit request
-  if (_preTransmission)
-  {
-    _preTransmission();
-  }
-  for (i = 0; i < u8ModbusADUSize; i++)
-  {
-    _serial->putc(u8ModbusADU[i]);
-  }
-  
   u8ModbusADUSize = 0;
-  //_serial->flush();    // flush transmit buffer
-  //Not needed, since mbed::Serial is not buffered
-  if (_postTransmission)
-  {
-    _postTransmission();
-  }
   
   // loop until we run out of time or bytes, or an error occurs
   Timer timer;
   timer.start();
-  while (u8BytesLeft && !u8MBStatus)
-  {
-    if (_serial->readable())
-    {
-#if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, true);
-#endif
-      u8ModbusADU[u8ModbusADUSize++] = _serial->getc();
-      u8BytesLeft--;
-#if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_A__, false);
-#endif
+  while (u8BytesLeft && !u8MBStatus) {
+    if (_serial->available()) {
+        char read_buf;
+        _serial->read(&read_buf, 1);
+        // printf("%02X ", read_buf);
+        u8ModbusADU[u8ModbusADUSize++] = read_buf;
+        u8BytesLeft--;
     }
-    else
-    {
-#if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_B__, true);
-#endif
-      if (_idle)
-      {
+    else {
+      if (_idle) {
         _idle();
       }
-#if __MODBUSMASTER_DEBUG__
-      digitalWrite(__MODBUSMASTER_DEBUG_PIN_B__, false);
-#endif
     }
     
     // evaluate slave ID, function code once enough bytes have been read
-    if (u8ModbusADUSize == 5)
-    {
+    if (u8ModbusADUSize == 5) {
       // verify response is for correct Modbus slave
-      if (u8ModbusADU[0] != _u8MBSlave)
-      {
+      if (u8ModbusADU[0] != _u8MBSlave) {
         u8MBStatus = ku8MBInvalidSlaveID;
         break;
       }
       
       // verify response is for correct Modbus function code (mask exception bit 7)
-      if ((u8ModbusADU[1] & 0x7F) != u8MBFunction)
-      {
+      if ((u8ModbusADU[1] & 0x7F) != u8MBFunction) {
         u8MBStatus = ku8MBInvalidFunction;
         break;
       }
       
       // check whether Modbus exception occurred; return Modbus Exception Code
-      if (bitRead(u8ModbusADU[1], 7))
-      {
+      if (bitRead(u8ModbusADU[1], 7)) {
         u8MBStatus = u8ModbusADU[2];
         break;
       }
       
       // evaluate returned Modbus function code
-      switch(u8ModbusADU[1])
-      {
+      switch(u8ModbusADU[1]) {
         case ku8MBReadCoils:
         case ku8MBReadDiscreteInputs:
         case ku8MBReadInputRegisters:
@@ -770,29 +742,27 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
         case ku8MBReadWriteMultipleRegisters:
           u8BytesLeft = u8ModbusADU[2];
           break;
-          
         case ku8MBWriteSingleCoil:
         case ku8MBWriteMultipleCoils:
         case ku8MBWriteSingleRegister:
         case ku8MBWriteMultipleRegisters:
           u8BytesLeft = 3;
           break;
-          
         case ku8MBMaskWriteRegister:
           u8BytesLeft = 5;
           break;
       }
     }
-    if ((timer.read_ms()) > ku16MBResponseTimeout)
-    {
+    if ((duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout) {
       u8MBStatus = ku8MBResponseTimedOut;
       timer.stop();
     }
   }
+
+//   printf("\n");
   
   // verify response is large enough to inspect further
-  if (!u8MBStatus && u8ModbusADUSize >= 5)
-  {
+  if (!u8MBStatus && u8ModbusADUSize >= 5) {
     // calculate CRC
     u16CRC = 0xFFFF;
     for (i = 0; i < (u8ModbusADUSize - 2); i++)
