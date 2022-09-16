@@ -1,13 +1,3 @@
-/**
-@file
-Arduino library for communicating with Modbus slaves over RS232/485 (via RTU protocol).
-
-@defgroup setup ModbusMaster Object Instantiation/Initialization
-@defgroup buffer ModbusMaster Buffer Management
-@defgroup discrete Modbus Function Codes for Discrete Coils/Inputs
-@defgroup register Modbus Function Codes for Holding/Input Registers
-@defgroup constant Modbus Function Codes, Exception Codes
-*/
 /*
 
   ModbusMaster.h - Arduino library for communicating with Modbus slaves
@@ -36,16 +26,6 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 #ifndef ModbusMaster_h
 #define ModbusMaster_h
 
-
-/**
-@def __MODBUSMASTER_DEBUG__ (0)
-Set to 1 to enable debugging features within class:
-  - PIN A cycles for each byte read in the Modbus response
-  - PIN B cycles for each millisecond timeout during the Modbus response
-*/
-#define __MODBUSMASTER_DEBUG__ (0)
-#define __MODBUSMASTER_DEBUG_PIN_A__ 4
-#define __MODBUSMASTER_DEBUG_PIN_B__ 5
 
 /* _____STANDARD INCLUDES____________________________________________________ */
 // include types & constants of Wiring core API
@@ -252,7 +232,7 @@ class ModbusMaster
     static const uint8_t ku8MBReadWriteMultipleRegisters = 0x17; ///< Modbus function 0x17 Read Write Multiple Registers
     
     // Modbus timeout [milliseconds]
-    static const uint16_t ku16MBResponseTimeout          = 100; ///< Modbus timeout [milliseconds]
+    static const uint16_t ku16MBResponseTimeout          = 600; ///< Modbus timeout [milliseconds]
     
     // master function that conducts Modbus transactions
     uint8_t ModbusMasterTransaction(uint8_t u8MBFunction);
@@ -266,8 +246,3 @@ class ModbusMaster
 };
 #endif
 
-/**
-@example examples/Basic/Basic.pde
-@example examples/PhoenixContact_nanoLC/PhoenixContact_nanoLC.pde
-@example examples/RS485_HalfDuplex/RS485_HalfDuplex.ino
-*/

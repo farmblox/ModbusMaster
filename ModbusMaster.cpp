@@ -50,21 +50,10 @@ Call once class has been instantiated, typically within setup().
 */
 void ModbusMaster::begin(uint8_t slave, RS485 &serial)
 {
-//  txBuffer = (uint16_t*) calloc(ku8MaxBufferSize, sizeof(uint16_t));
   _u8MBSlave = slave;
   _serial = &serial;
   _u8TransmitBufferIndex = 0;
   u16TransmitBufferLength = 0;
-
-//   _serial->enable_output( false );
-//   _serial->enable_input( false );
-//   _serial->set_blocking( true );
-
-  
-#if __MODBUSMASTER_DEBUG__
-  pinMode(__MODBUSMASTER_DEBUG_PIN_A__, OUTPUT);
-  pinMode(__MODBUSMASTER_DEBUG_PIN_B__, OUTPUT);
-#endif
 }
 
 
@@ -706,11 +695,8 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
         // printf("%02X ", read_buf);
         u8ModbusADU[u8ModbusADUSize++] = read_buf;
         u8BytesLeft--;
-    }
-    else {
-      if (_idle) {
+    } else if (_idle) {
         _idle();
-      }
     }
     
     // evaluate slave ID, function code once enough bytes have been read
@@ -753,7 +739,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
           break;
       }
     }
-    if ((duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout) {
+    if ((chrono::duration_cast<chrono::milliseconds>(timer.elapsed_time()).count()) > ku16MBResponseTimeout) {
       u8MBStatus = ku8MBResponseTimedOut;
       timer.stop();
     }
