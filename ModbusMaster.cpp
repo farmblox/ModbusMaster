@@ -28,7 +28,7 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
 #include "ModbusMaster.h"
 
 #include "mbed-trace/mbed_trace.h"
-#define TRACE_GROUP "MODBUS"
+#define TRACE_GROUP "MODB"
 
 
 ModbusMaster::ModbusMaster(void)
@@ -677,9 +677,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   u8ModbusADU[u8ModbusADUSize] = 0;
 
   // flush receive buffer before transmitting request
-  while (_serial->available()) {
-      _serial->read_single();
-  };
+  _serial->flush();
 
   _serial->write(u8ModbusADU, u8ModbusADUSize);
 
@@ -689,7 +687,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   Timer timer;
   timer.start();
   while (u8BytesLeft && !u8MBStatus) {
-    if (_serial->available()) {
+    if (_serial->poll(POLLIN)) {
         char read_buf;
         _serial->read(&read_buf, 1);
         // printf("%02X ", read_buf);
