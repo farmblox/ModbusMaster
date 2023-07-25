@@ -480,13 +480,6 @@ uint8_t ModbusMaster::writeMultipleRegisters(uint16_t u16WriteAddress,
   return ModbusMasterTransaction(ku8MBWriteMultipleRegisters);
 }
 
-// new version based on Wire.h
-uint8_t ModbusMaster::writeMultipleRegisters()
-{
-  _u16WriteQty = _u8TransmitBufferIndex;
-  return ModbusMasterTransaction(ku8MBWriteMultipleRegisters);
-}
-
 
 /**
 Modbus function 0x16 Mask Write Register.

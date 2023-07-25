@@ -195,7 +195,6 @@ class ModbusMaster
     uint8_t  writeMultipleCoils(uint16_t, uint16_t);
     uint8_t  writeMultipleCoils();
     uint8_t  writeMultipleRegisters(uint16_t, uint16_t);
-    uint8_t  writeMultipleRegisters();
     uint8_t  maskWriteRegister(uint16_t, uint16_t, uint16_t);
     uint8_t  readWriteMultipleRegisters(uint16_t, uint16_t, uint16_t, uint16_t);
     uint8_t  readWriteMultipleRegisters(uint16_t, uint16_t);
