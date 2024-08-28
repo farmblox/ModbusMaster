@@ -30,7 +30,7 @@
 /* _____STANDARD INCLUDES____________________________________________________ */
 // include types & constants of Wiring core API
 #include "mbed.h"
-#include "mbed-rs485/RS485.h"
+#include "RS485.h"
 
 /* _____UTILITY MACROS_______________________________________________________ */
 
